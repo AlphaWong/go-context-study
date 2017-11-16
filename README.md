@@ -47,16 +47,58 @@ func GetCacheAPIKeys(c string) interface{} {
 
 # Run
 ```sh
-go run ./main.go
+$ go test -bench=BenchmarkTesting -benchmem
+goos: linux
+goarch: amd64
+pkg: github.com/go-context-study
+BenchmarkTestingCtxSet-4       	 5000000	       222 ns/op	      79 B/op	       4 allocs/op
+BenchmarkTestingCtxGet-4       	30000000	        82.7 ns/op	      20 B/op	       2 allocs/op
+BenchmarkTestingSyncMapSet-4   	10000000	       143 ns/op	      48 B/op	       4 allocs/op
+BenchmarkTestingSyncMapGet-4   	30000000	        39.3 ns/op	       0 B/op	       0 allocs/op
 ```
 
 # Expected result
 ```sh
-ctx will work
-found value: Go
-key not found: color
-found value: Go2
+Ctx should always faster than sync Map
 ```
+
+# Actual result
+```
+Sync map always faster than ctx
+```
+
+# Reason
+```
+sync map is hash based
+
+ctx is a linked list
+```
+
+# ctx code
+```go
+// https://golang.org/src/context/context.go#L477<Paste>
+// A valueCtx carries a key-value pair. It implements Value for that key and
+// delegates all other calls to the embedded Context.
+type valueCtx struct {
+	Context
+	key, val interface{}
+}
+
+func (c *valueCtx) String() string {
+	return fmt.Sprintf("%v.WithValue(%#v, %#v)", c.Context, c.key, c.val)
+}
+
+func (c *valueCtx) Value(key interface{}) interface{} {
+	if c.key == key {
+		return c.val
+	}
+	return c.Context.Value(key)
+}
+```
+
+# Sum up
+Both sync map and ctx is thread safe. However, ctx will always O(n) for get function.
+Meanwhile sync map is hash based that get function will always O(1).
 
 # Reference
 1. https://github.com/googlearchive/ioweb2016/blob/master/backend/cache.go
